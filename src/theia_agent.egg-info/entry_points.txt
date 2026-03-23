@@ -1,0 +1,3 @@
+[console_scripts]
+theia = theia_agent.cli:main
+theia-mcp = theia_agent.server:main

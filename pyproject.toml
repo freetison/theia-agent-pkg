@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "theia-agent"
+version = "0.1.0"
+description = "Pass-through CLI router for Claude Code and Copilot agents"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp",
+    "prompt_toolkit>=3.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+
+[project.scripts]
+theia      = "theia_agent.cli:main"
+theia-mcp  = "theia_agent.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src/theia_agent --cov-report=term-missing --cov-fail-under=80"

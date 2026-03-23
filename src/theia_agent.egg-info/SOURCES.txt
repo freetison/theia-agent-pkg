@@ -1,0 +1,11 @@
+README.md
+pyproject.toml
+src/theia_agent/__init__.py
+src/theia_agent/cli.py
+src/theia_agent/server.py
+src/theia_agent.egg-info/PKG-INFO
+src/theia_agent.egg-info/SOURCES.txt
+src/theia_agent.egg-info/dependency_links.txt
+src/theia_agent.egg-info/entry_points.txt
+src/theia_agent.egg-info/requires.txt
+src/theia_agent.egg-info/top_level.txt

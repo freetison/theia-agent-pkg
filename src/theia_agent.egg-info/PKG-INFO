@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: theia-agent
+Version: 0.1.0
+Summary: Pass-through CLI router for Claude Code and Copilot agents
+Requires-Python: >=3.11
+Requires-Dist: fastmcp
+Requires-Dist: prompt_toolkit>=3.0
+Provides-Extra: test
+Requires-Dist: pytest>=8.0; extra == "test"
+Requires-Dist: pytest-cov>=5.0; extra == "test"
