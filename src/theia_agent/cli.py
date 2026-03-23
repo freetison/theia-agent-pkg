@@ -247,10 +247,44 @@ def _generate_msg(diff: str) -> str | None:
 
 def run_commit(all_repos: bool = False) -> int:
     cwd = os.getcwd()
-    diff_cmd = ["git", "diff", "HEAD"] if all_repos else ["git", "diff", "--staged"]
-    diff = subprocess.run(diff_cmd, capture_output=True, text=True, cwd=cwd).stdout.strip()
-    if not diff and not all_repos:
-        diff = subprocess.run(["git", "diff"], capture_output=True, text=True, cwd=cwd).stdout.strip()
+    if all_repos:
+        diff_proc = subprocess.run(["git", "diff", "HEAD"], capture_output=True, text=True, cwd=cwd)
+        status_proc = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, cwd=cwd)
+
+        if getattr(diff_proc, "returncode", 0) != 0 or getattr(status_proc, "returncode", 0) != 0:
+            err = (getattr(diff_proc, "stderr", "") or getattr(status_proc, "stderr", "") or "").strip()
+            print(f"  [theia] Error al leer estado git. {err}".rstrip())
+            return 1
+
+        status = status_proc.stdout.strip()
+        if not status:
+            print("  [theia] No hay cambios para commitear.")
+            return 1
+
+        diff = diff_proc.stdout.strip()
+        untracked = [line[3:] for line in status.splitlines() if line.startswith("?? ")]
+        if untracked:
+            # ES: añade contexto de archivos nuevos para que GPT-4o no ignore cambios untracked.
+            # EN: add context for new files so GPT-4o does not miss untracked changes.
+            new_files_block = "\n".join(f"new file: {path}" for path in untracked)
+            extra = f"# untracked files\n{new_files_block}"
+            diff = f"{diff}\n\n{extra}".strip()
+    else:
+        staged_proc = subprocess.run(["git", "diff", "--staged"], capture_output=True, text=True, cwd=cwd)
+        if getattr(staged_proc, "returncode", 0) != 0:
+            err = (getattr(staged_proc, "stderr", "") or "").strip()
+            print(f"  [theia] Error al leer estado git. {err}".rstrip())
+            return 1
+
+        diff = staged_proc.stdout.strip()
+        if not diff:
+            working_proc = subprocess.run(["git", "diff"], capture_output=True, text=True, cwd=cwd)
+            if getattr(working_proc, "returncode", 0) != 0:
+                err = (getattr(working_proc, "stderr", "") or "").strip()
+                print(f"  [theia] Error al leer estado git. {err}".rstrip())
+                return 1
+            diff = working_proc.stdout.strip()
+
     if not diff:
         print("  [theia] No hay cambios para commitear.")
         return 1
