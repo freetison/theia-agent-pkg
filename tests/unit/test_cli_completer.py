@@ -58,3 +58,16 @@ def test_file_completions_nonexistent_dir_returns_empty(monkeypatch, tmp_path):
     items = list(completer._file_completions("missing/path"))
 
     assert items == []
+
+
+def test_file_completions_support_backslash_separator(monkeypatch, tmp_path):
+    (tmp_path / "theia-dev-tools").mkdir()
+    (tmp_path / "theia-dev-tools" / "docker-compose.yml").write_text("services: {}", encoding="utf-8")
+
+    monkeypatch.setattr(cli.os, "getcwd", lambda: str(tmp_path))
+
+    completer = cli.TheiaCompleter()
+    items = list(completer._file_completions("theia-dev-tools\\"))
+    displays = {item.display_text for item in items}
+
+    assert "docker-compose.yml" in displays

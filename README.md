@@ -18,7 +18,7 @@ Router CLI/MCP de pass-through para agentes de Claude Code y GitHub Copilot.
 
 - Python 3.11+
 - `claude` CLI installed for Claude routes.
-- `gh` CLI + `gh extension install github/gh-copilot` for Copilot routes.
+- `gh` CLI with Copilot access (`gh copilot` downloads CLI automatically).
 - `git` and `git super` command available for commit flows.
 - Authenticated GitHub CLI session (`gh auth login`).
 

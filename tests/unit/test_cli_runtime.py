@@ -120,3 +120,15 @@ def test_main_with_invalid_usage_exits_1(monkeypatch):
         cli.main()
 
     assert exc_info.value.code == 1
+
+
+def test_read_repl_input_single_line():
+    prompt_calls = iter(["/devops hola"])
+    line = cli._read_repl_input(lambda: next(prompt_calls), lambda: "")
+    assert line == "/devops hola"
+
+
+def test_read_repl_input_multiline_with_trailing_backslash():
+    prompt_calls = iter(["/devops linea 1\\", "linea 2"])
+    line = cli._read_repl_input(lambda: next(prompt_calls), lambda: next(prompt_calls))
+    assert line == "/devops linea 1\nlinea 2"

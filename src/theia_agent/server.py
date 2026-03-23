@@ -33,7 +33,7 @@ ROUTES = {
     "reviewer":   {"cli": "claude", "agent": "reviewer",   "desc": "Code review"},
     "backend":    {"cli": "claude", "agent": "backend",    "desc": "Backend — APIs, servicios"},
 
-    # ES: agentes de Copilot -> gh copilot suggest | EN: Copilot agents -> gh copilot suggest
+    # ES: agentes de Copilot -> gh copilot -- -i | EN: Copilot agents -> gh copilot -- -i
     # ES: archivos en .github/copilot/agents/<n>.agent.md | EN: files live in .github/copilot/agents/<n>.agent.md
     "co-backend":  {"cli": "copilot", "agent": "backend",  "desc": "Copilot backend (operacional)"},
     "co-frontend": {"cli": "copilot", "agent": "frontend", "desc": "Copilot frontend (operacional)"},

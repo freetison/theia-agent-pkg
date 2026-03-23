@@ -121,14 +121,20 @@ class TheiaCompleter(Completer):
 
     def _file_completions(self, partial: str):
         cwd = Path(os.getcwd())
+        prefers_backslash = "\\" in partial and "/" not in partial
+        sep = "\\" if prefers_backslash else "/"
+        normalized = partial.replace("\\", "/")
 
         # ES: separar directorio base y fragmento final | EN: split base directory and final fragment
-        if "/" in partial or "\\" in partial:
-            base = Path(partial).parent
-            frag = Path(partial).name
+        if normalized.endswith("/"):
+            base = Path(normalized.rstrip("/"))
+            frag = ""
+        elif "/" in normalized:
+            base = Path(normalized).parent
+            frag = Path(normalized).name
         else:
             base = Path(".")
-            frag = partial
+            frag = normalized
 
         search_dir = (cwd / base).resolve()
 
@@ -142,13 +148,30 @@ class TheiaCompleter(Completer):
                 continue  # ES: ocultar dotfiles salvo que el usuario los pida | EN: hide dotfiles unless explicitly requested
             if entry.name.lower().startswith(frag.lower()):
                 suffix = "/" if entry.is_dir() else ""
-                rel = str(entry.relative_to(cwd)).replace("\\", "/")
+                rel = str(entry.relative_to(cwd)).replace("\\", sep)
                 yield Completion(
-                    text=rel + suffix,
+                    text=rel + (sep if entry.is_dir() else ""),
                     start_position=-len(partial),
-                    display=entry.name + suffix,
+                    display=entry.name + (sep if entry.is_dir() else ""),
                     display_meta="dir" if entry.is_dir() else entry.suffix or "file",
                 )
+
+
+def _read_repl_input(prompt_fn, cont_prompt_fn):
+    """
+    ES: permite multiline usando '\\' al final de linea.
+    EN: allows multiline using trailing '\\'.
+    """
+    chunks = []
+    line = prompt_fn()
+
+    while True:
+        if line.endswith("\\"):
+            chunks.append(line[:-1])
+            line = cont_prompt_fn()
+            continue
+        chunks.append(line)
+        return "\n".join(chunks)
 
 
 # ES: commit helper via Copilot API con GPT-4o | EN: commit helper via Copilot API with GPT-4o
@@ -264,14 +287,72 @@ def run_commit(all_repos: bool = False) -> int:
 
 # ES: pass-through generico | EN: generic pass-through
 
+def _extract_add_dirs(prompt: str) -> list[str]:
+    """
+    ES: detecta tokens @ruta en el prompt y devuelve directorios existentes.
+    EN: detects @path tokens in prompt and returns existing directories.
+    """
+    if not prompt:
+        return []
+
+    cwd = Path(os.getcwd())
+    result: list[str] = []
+
+    for token in prompt.split():
+        if not token.startswith("@"):
+            continue
+
+        raw = token[1:].strip('"\'.,;:!?()[]{}')
+        if not raw:
+            continue
+
+        p = Path(raw)
+        if p.is_absolute():
+            candidates = [p]
+        else:
+            # ES: heuristica para monorepo hermano (theia-v2) y cwd actual.
+            # EN: heuristic for sibling monorepo (theia-v2) and current cwd.
+            candidates = [
+                cwd / p,
+                cwd.parent / p,
+                cwd.parent / "theia-v2" / p,
+            ]
+
+        chosen = next((c for c in candidates if c.exists()), None)
+        if not chosen:
+            continue
+
+        target = chosen if chosen.is_dir() else chosen.parent
+        target_s = str(target.resolve())
+        if target_s not in result:
+            result.append(target_s)
+
+    return result
+
 def build_command(cmd: str, prompt: str) -> list[str]:
     route = ROUTES[cmd]
+    add_dirs = _extract_add_dirs(prompt)
+
     if route["cli"] == "claude":
-        return ["claude", "--agent", route["agent"], "-p", prompt] if prompt \
-          else ["claude", "--agent", route["agent"]]
+        # ES: prompt inicia sesion interactiva para continuar con opciones/respuestas.
+        # EN: prompt starts interactive session so user can continue with options/replies.
+        argv = ["claude", "--agent", route["agent"]]
+        for d in add_dirs:
+            argv.extend(["--add-dir", d])
+        if prompt:
+            argv.append(prompt)
+        return argv
+
+    # ES: usar modo interactivo para no truncar y permitir seguimiento en la misma sesion.
+    # EN: use interactive mode to avoid truncation and allow follow-up in same session.
+    argv = ["gh", "copilot", "--"]
+    for d in add_dirs:
+        argv.extend(["--add-dir", d])
+    if prompt:
+        argv.extend(["-i", prompt])
     else:
-        return ["gh", "copilot", "suggest", "-t", "shell", prompt] if prompt \
-          else ["gh", "copilot", "suggest", "-t", "shell"]
+        argv.append("--continue")
+    return argv
 
 def run_passthrough(argv: list[str]) -> int:
     try:
@@ -279,7 +360,7 @@ def run_passthrough(argv: list[str]) -> int:
     except FileNotFoundError:
         hints = {
             "claude": "https://docs.anthropic.com/claude-code",
-            "gh":     "https://cli.github.com/ → gh extension install github/gh-copilot",
+            "gh":     "https://cli.github.com/ → then run: gh copilot",
             "git":    "https://git-scm.com/",
         }
         print(f"\n  [theia] No encontrado: {argv[0]}", file=sys.stderr)
@@ -310,6 +391,7 @@ def print_help():
     print("  Autocompletado:")
     print("    /   →  lista de agentes")
     print("    @   →  selector de rutas del filesystem")
+    print("    \\ al final de linea  →  continuar en multiline")
     print()
     print("  /list · /exit")
     print()
@@ -356,13 +438,15 @@ def repl():
             }),
         )
         prompt_fn = lambda: session.prompt(HTML("<prompt>theia</prompt> › "))
+        cont_prompt_fn = lambda: session.prompt(HTML("<prompt>...  </prompt> "))
     else:
         # ES: fallback si prompt_toolkit no esta disponible | EN: fallback when prompt_toolkit is unavailable
         prompt_fn = lambda: input("theia › ")
+        cont_prompt_fn = lambda: input("...   ")
 
     while True:
         try:
-            line = prompt_fn().strip()
+            line = _read_repl_input(prompt_fn, cont_prompt_fn).strip()
         except (EOFError, KeyboardInterrupt):
             print(); break
 
